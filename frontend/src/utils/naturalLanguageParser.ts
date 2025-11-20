@@ -1,8 +1,9 @@
 import { fileManager } from './fileUtils';
 import { aiTeam } from './aiTeam';
+import { instructionGuide } from './InstructionGuide';
 
 export interface ParsedCommand {
-  type: 'ai_chat' | 'file_operation' | 'project_operation' | 'team_operation' | 'help' | 'unknown';
+  type: 'ai_chat' | 'file_operation' | 'project_operation' | 'team_operation' | 'walkthrough' | 'help' | 'unknown';
   action?: string;
   target?: string;
   content?: string;
@@ -59,6 +60,15 @@ export class NaturalLanguageParser {
     { pattern: /show (?:me )?(?:the )?project structure/i, action: 'project_structure' },
   ];
 
+  private walkthroughPatterns = [
+    // Walkthrough commands
+    { pattern: /^walkthrough$/i, action: 'list_walkthroughs' },
+    { pattern: /^walkthrough\s+(\w+(?:-\w+)*)$/i, action: 'start_walkthrough' },
+    { pattern: /^walkthrough-status\s+(\w+(?:-\w+)*)$/i, action: 'walkthrough_status' },
+    { pattern: /^walkthrough-complete\s+(\w+(?:-\w+)*)\s+(\w+(?:_\w+)*)$/i, action: 'complete_step' },
+    { pattern: /^walkthrough-reset\s+(\w+(?:-\w+)*)$/i, action: 'reset_walkthrough' }
+  ];
+
   private teamPatterns = [
     // Team member requests
     { pattern: /(?:talk to|ask|get) (?:the )?team/i, action: 'team_chat' },
@@ -94,7 +104,21 @@ export class NaturalLanguageParser {
       return { type: 'help' };
     }
 
-    // Check for team operations (highest priority)
+    // Check for walkthrough commands (highest priority)
+    for (const pattern of this.walkthroughPatterns) {
+      const match = cleanInput.match(pattern.pattern);
+      if (match) {
+        return {
+          type: 'walkthrough',
+          action: pattern.action,
+          target: match[1],
+          content: match[2],
+          currentFile,
+        };
+      }
+    }
+
+    // Check for team operations
     for (const pattern of this.teamPatterns) {
       const match = cleanInput.match(pattern.pattern);
       if (match) {
@@ -189,6 +213,9 @@ export class NaturalLanguageParser {
 
   async executeCommand(command: ParsedCommand, onFileSelect?: (path: string) => void): Promise<string> {
     switch (command.type) {
+      case 'walkthrough':
+        return this.executeWalkthroughCommand(command);
+        
       case 'team_operation':
         return this.executeTeamOperation(command, onFileSelect);
         
@@ -208,6 +235,75 @@ export class NaturalLanguageParser {
       
       default:
         return "I'm not sure what you want me to do. Try asking the team for help or type 'help' for commands.";
+    }
+  }
+
+  private executeWalkthroughCommand(command: ParsedCommand): string {
+    const { action, target, content } = command;
+
+    switch (action) {
+      case 'list_walkthroughs':
+        return instructionGuide.formatWalkthroughList();
+
+      case 'start_walkthrough':
+        if (!target) return "Please specify a walkthrough name.";
+        const currentStep = instructionGuide.getCurrentStep(target);
+        if (currentStep) {
+          return instructionGuide.formatStepInstructions(target, currentStep);
+        } else {
+          const firstStep = instructionGuide.startWalkthrough(target);
+          if (firstStep) {
+            return `🎉 **Started ${target} walkthrough!**\\n\\n` + 
+                   instructionGuide.formatStepInstructions(target, firstStep);
+          } else {
+            return `Walkthrough "${target}" not found. Try: walkthrough`;
+          }
+        }
+
+      case 'walkthrough_status':
+        if (!target) return "Please specify a walkthrough name.";
+        const progress = instructionGuide.getProgress(target);
+        if (progress) {
+          const walkthrough = instructionGuide.getWalkthrough(target);
+          if (walkthrough) {
+            const completionPercent = Math.round((progress.completedSteps.length / walkthrough.totalSteps) * 100);
+            return `📊 **${walkthrough.title} Progress:**\\n\\n` +
+                   `✅ Completed: ${progress.completedSteps.length}/${walkthrough.totalSteps} steps (${completionPercent}%)\\n` +
+                   `📅 Started: ${progress.startedAt.toLocaleDateString()}\\n` +
+                   `🕒 Last accessed: ${progress.lastAccessed.toLocaleDateString()}\\n` +
+                   `🎯 Status: ${progress.isCompleted ? 'Completed' : 'In Progress'}`;
+          }
+        }
+        return `No progress found for "${target}". Start with: walkthrough ${target}`;
+
+      case 'complete_step':
+        if (!target || !content) return "Usage: walkthrough-complete <walkthrough> <step_id>";
+        const nextStep = instructionGuide.completeStep(target, content);
+        if (nextStep) {
+          return `✅ **Step completed!**\\n\\n` +
+                 instructionGuide.formatStepInstructions(target, nextStep);
+        } else {
+          const walkthrough = instructionGuide.getWalkthrough(target);
+          if (walkthrough) {
+            return `🎉 **Congratulations!** You've completed the ${walkthrough.title} walkthrough!\\n\\n` +
+                   `🏆 **Achievement Unlocked:** ${walkthrough.title}\\n` +
+                   `⏱️ **Time invested:** ${walkthrough.estimatedTime} minutes\\n\\n` +
+                   `🚀 **Next steps:** Try another walkthrough or start building your own features!`;
+          }
+          return "Walkthrough or step not found.";
+        }
+
+      case 'reset_walkthrough':
+        if (!target) return "Please specify a walkthrough name.";
+        const resetSuccess = instructionGuide.resetProgress(target);
+        if (resetSuccess) {
+          return `🔄 **Reset completed!** The "${target}" walkthrough progress has been cleared.\\n\\n` +
+                 `You can start fresh with: walkthrough ${target}`;
+        }
+        return `Failed to reset "${target}" walkthrough.`;
+
+      default:
+        return "Unknown walkthrough command.";
     }
   }
 

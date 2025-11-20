@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import styled from 'styled-components';
+import { instructionGuide } from '../utils/InstructionGuide';
 
 interface ClaudeTerminalProps {
   onCommandExecute?: (command: string) => void;
@@ -244,13 +245,19 @@ const ClaudeTerminal: React.FC<ClaudeTerminalProps> = ({
     { command: 'claude review', description: 'Get code review with AI team' },
     { command: 'claude debug', description: 'Debug assistance with full context' },
     { command: 'claude context', description: 'Show current project context' },
-    { command: 'claude refactor', description: 'Get refactoring suggestions' }
+    { command: 'claude refactor', description: 'Get refactoring suggestions' },
+    { command: 'walkthrough onboarding', description: 'Start FreddyMac IDE onboarding walkthrough' },
+    { command: 'walkthrough new-feature', description: 'Learn how to add a new feature to your project' },
+    { command: 'walkthrough bug-fix', description: 'Learn systematic debugging and fixing workflow' },
+    { command: 'walkthrough-status <topic>', description: 'Check progress of a specific walkthrough' },
+    { command: 'walkthrough-complete <topic> <step>', description: 'Mark a walkthrough step as completed' },
+    { command: 'walkthrough-reset <topic>', description: 'Reset progress for a specific walkthrough' }
   ];
 
   // Initialize terminal with welcome message
   useEffect(() => {
     addEntry('system', '🚀 Freddy Mac IDE Terminal - Enterprise Edition with Claude Code Integration');
-    addEntry('system', 'Type "claude help" to see available AI commands or "claude toggle" to enable Claude Code');
+    addEntry('system', 'Type "claude help" to see available AI commands or "walkthrough onboarding" to get started');
     checkClaudeStatus();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -298,6 +305,10 @@ const ClaudeTerminal: React.FC<ClaudeTerminalProps> = ({
       // Check if it's a Claude command
       if (command.trim().startsWith('claude')) {
         await executeClaudeCommand(command);
+      }
+      // Check if it's a walkthrough command
+      else if (command.trim().startsWith('walkthrough')) {
+        await executeWalkthroughCommand(command);
       } else {
         // Execute regular terminal command
         const response = await fetch('/api/terminal/execute', {
@@ -381,12 +392,109 @@ const ClaudeTerminal: React.FC<ClaudeTerminalProps> = ({
     }
   };
 
+  const executeWalkthroughCommand = async (command: string) => {
+    try {
+      const parts = command.trim().split(/\s+/);
+      const mainCommand = parts[0]; // 'walkthrough' or 'walkthrough-status' etc
+      const subcommand = parts[1]; // topic or action
+      const arg = parts[2]; // additional argument if any
+
+      if (mainCommand === 'walkthrough' && subcommand) {
+        // Handle main walkthrough command: walkthrough <topic>
+        const output = instructionGuide.generateWalkthroughOutput(subcommand);
+        addEntry('system', output);
+        return;
+      }
+
+      if (mainCommand === 'walkthrough-status' && subcommand) {
+        // Handle status command: walkthrough-status <topic>
+        const output = instructionGuide.generateStatusOutput(subcommand);
+        addEntry('system', output);
+        return;
+      }
+
+      if (mainCommand === 'walkthrough-complete' && subcommand && arg) {
+        // Handle completion command: walkthrough-complete <topic> <stepId>
+        const completedStep = instructionGuide.completeStep(subcommand, arg);
+        if (completedStep) {
+          const topic = instructionGuide.getTopicInfo(subcommand);
+          const progress = instructionGuide.getProgress(subcommand);
+          if (topic && progress && progress.completedSteps.length === topic.steps.length) {
+            addEntry('system', `🎉 Walkthrough "${topic.title}" completed!\n\nGreat job completing this walkthrough!`);
+          } else {
+            addEntry('system', `✅ Step "${arg}" marked as completed. Progress: ${progress?.completedSteps.length || 0}/${topic?.steps.length || 0} steps.`);
+          }
+        } else {
+          addEntry('error', `Failed to complete step "${arg}" for topic "${subcommand}"`);
+        }
+        return;
+      }
+
+      if (mainCommand === 'walkthrough-reset' && subcommand) {
+        // Handle reset command: walkthrough-reset <topic>
+        const success = instructionGuide.resetWalkthrough(subcommand);
+        if (success) {
+          addEntry('system', `🔄 Walkthrough "${subcommand}" has been reset. Run \`walkthrough ${subcommand}\` to start again.`);
+        } else {
+          addEntry('error', `Failed to reset walkthrough "${subcommand}". Topic may not exist.`);
+        }
+        return;
+      }
+
+      if (mainCommand === 'walkthrough' && !subcommand) {
+        // Show available walkthroughs
+        const topics = instructionGuide.getAvailableTopics();
+        const stats = instructionGuide.getOverallStats();
+        
+        let output = `📚 **FreddyMac IDE Learning Center**
+
+**Available Walkthroughs:**
+${topics.map((topicId: string) => {
+  const topic = instructionGuide.getTopicInfo(topicId);
+  const progress = instructionGuide.getProgress(topicId);
+  const status = progress ? (progress.isCompleted ? '✅' : '🔄') : '⏳';
+  return `${status} ${topicId} - ${topic?.title} (${topic?.difficulty})`;
+}).join('\n')}
+
+**Your Progress:**
+- Topics Started: ${stats.inProgress + stats.completed}/${stats.total}
+- Completed: ${stats.completed}/${stats.total}
+- Overall Completion: ${Math.round((stats.completed / stats.total) * 100)}%
+
+**Usage:**
+• \`walkthrough <topic>\` - Start or continue a walkthrough
+• \`walkthrough-status <topic>\` - Check progress
+• \`walkthrough-complete <topic> <step>\` - Mark step completed
+• \`walkthrough-reset <topic>\` - Reset walkthrough
+
+**Getting Started:**
+Run \`walkthrough onboarding\` for your first guided experience!`;
+        
+        addEntry('system', output);
+        return;
+      }
+
+      // Unknown walkthrough command
+      addEntry('error', `Unknown walkthrough command: ${command}
+      
+Available commands:
+• walkthrough - List all walkthroughs
+• walkthrough <topic> - Start/continue walkthrough
+• walkthrough-status <topic> - Check progress
+• walkthrough-complete <topic> <step> - Complete step
+• walkthrough-reset <topic> - Reset walkthrough`);
+
+    } catch (error) {
+      addEntry('error', `Walkthrough Error: ${error}`);
+    }
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setInput(value);
     
-    // Show suggestions for Claude commands
-    if (value.startsWith('claude')) {
+    // Show suggestions for Claude and walkthrough commands
+    if (value.startsWith('claude') || value.startsWith('walkthrough')) {
       setShowSuggestions(true);
     } else {
       setShowSuggestions(false);
