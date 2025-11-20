@@ -11,20 +11,100 @@
 .terminal-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 8px 16px;
-  background: #2d2d30;
+  align-items: stretch;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #2d2d30 0%, #1e1e1e 100%);
   border-bottom: 1px solid #3e3e42;
   font-size: 14px;
+  min-height: 60px;
+}
+
+.terminal-title-section {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .terminal-title {
-  font-weight: 600;
+  font-weight: 700;
   color: #569cd6;
+  font-size: 16px;
+  margin-bottom: 2px;
 }
 
-.terminal-provider {
+.terminal-subtitle {
+  font-size: 12px;
   color: #9cdcfe;
+  opacity: 0.8;
+}
+
+/* Heads-Up Display (HUD) Styles */
+.terminal-hud {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(86, 156, 214, 0.1);
+  border: 1px solid rgba(86, 156, 214, 0.3);
+  border-radius: 8px;
+  backdrop-filter: blur(5px);
+}
+
+.hud-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.hud-label {
+  font-size: 10px;
+  color: #9cdcfe;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+.hud-value {
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.hud-value.active {
+  color: #4fc3f7;
+  text-shadow: 0 0 8px rgba(79, 195, 247, 0.5);
+}
+
+.hud-value.inactive {
+  color: #6a6a6a;
+}
+
+.hud-value.ready {
+  color: #66bb6a;
+}
+
+.hud-value.processing {
+  color: #ffa726;
+}
+
+.hud-value.error {
+  color: #f44747;
+}
+
+.hud-value.provider {
+  color: #9cdcfe;
+}
+
+.loading-spinner {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+  margin-right: 4px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .terminal-warning {
@@ -40,10 +120,17 @@
 }
 
 .terminal-line {
-  margin-bottom: 4px;
+  margin-bottom: 8px;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   word-break: break-word;
+  position: relative;
+}
+
+.terminal-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .terminal-timestamp {
@@ -105,6 +192,13 @@
   color: #569cd6;
   margin-right: 8px;
   font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.terminal-prompt.agentic {
+  color: #4fc3f7;
+  text-shadow: 0 0 8px rgba(79, 195, 247, 0.3);
+  font-weight: 700;
 }
 
 .terminal-input {
@@ -143,6 +237,91 @@
   background: #4e4e52;
 }
 
+/* Action Buttons Styles */
+.action-buttons-container {
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(86, 156, 214, 0.05);
+  border-left: 3px solid #569cd6;
+  border-radius: 0 6px 6px 0;
+}
+
+.actions-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #9cdcfe;
+  font-weight: 600;
+}
+
+.actions-icon {
+  font-size: 16px;
+}
+
+.actions-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.action-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(86, 156, 214, 0.1);
+  border: 1px solid #569cd6;
+  border-radius: 6px;
+  color: #d4d4d4;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(5px);
+}
+
+.action-button:hover:not(:disabled) {
+  background: rgba(86, 156, 214, 0.2);
+  border-color: #4fc3f7;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(86, 156, 214, 0.2);
+}
+
+.action-button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(86, 156, 214, 0.1);
+}
+
+.action-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.action-icon {
+  font-size: 14px;
+}
+
+.action-text {
+  font-weight: 500;
+}
+
+.priority-indicator {
+  font-size: 12px;
+  margin-left: 4px;
+  animation: glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+  from {
+    text-shadow: 0 0 5px #ff4757;
+  }
+  to {
+    text-shadow: 0 0 10px #ff4757, 0 0 15px #ff4757;
+  }
+}
+
 /* Loading animation */
 .terminal-ai .terminal-content:contains("thinking") {
   animation: pulse 1.5s infinite;
@@ -152,4 +331,26 @@
   0% { opacity: 1; }
   50% { opacity: 0.5; }
   100% { opacity: 1; }
+}
+
+/* Enhanced responsive design */
+@media (max-width: 768px) {
+  .terminal-hud {
+    flex-direction: column;
+    gap: 8px;
+    padding: 6px;
+  }
+  
+  .hud-section {
+    flex-direction: row;
+    gap: 6px;
+  }
+  
+  .actions-grid {
+    flex-direction: column;
+  }
+  
+  .action-button {
+    justify-content: center;
+  }
 }
